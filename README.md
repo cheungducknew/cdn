@@ -4,5 +4,7 @@ https://cdn.jsdelivr.net/gh/cheungducknew/cdn@latest/
 
 上传命令
 ```
-git add . && git commit -m "update" && git push -f
+git add . 
+git commit -m "update" 
+git push -f		#force
 ```
