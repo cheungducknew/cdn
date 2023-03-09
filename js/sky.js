@@ -6,7 +6,7 @@ var f_select; // 乐谱选择
 
 var isPlay = false;  // 是否可以弹奏乐谱
 var playing = false;  // 是否正在弹奏乐谱
-var musicDir = '/sdcard/skyMusic/'; // 乐谱文件存放目录
+var musicDir = '/sdcard/skyMusicAuto/'; // 乐谱文件存放目录
 var musicList = []; // 乐谱列表
 var musicName; // 乐谱名字
 var musicIndex = -1; // 选择的乐谱下标
@@ -39,7 +39,7 @@ importClass(android.view.inputmethod.EditorInfo);
  * @method 自执行函数（主函数入口）
  */
 (function() {
-  tip('弹奏脚本仅供娱乐和欣赏，请勿在【正规场合】弹奏(装逼)，使用过程中遇到问题请联系开发者wx:Liang2uv —— 光遇·六六', 'alert');
+  tip('请开启【无障碍】【悬浮窗】【访问设备信息】三种权限，遇到问题请联系开发者wx:Liang2uv —— 光遇·六六', 'alert');
   posInit();
   musicItems(); // 1. 获取乐谱列表
   if (!this.musicList.length) { return; }
@@ -65,14 +65,13 @@ importClass(android.view.inputmethod.EditorInfo);
 })();
 
 function posInit() {
-  let radio = device.width / 1080;
-  x = Math.ceil(x * radio);
-  y = Math.ceil(y * radio);
-  playW = Math.ceil(playW * radio);
-  playH = Math.ceil(playH * radio);
-  keySize = Math.ceil(keySize * radio);
-  spanSize = Math.ceil(spanSize * radio);
-  posExt = Math.ceil(posExt * radio);
+  x = px2px(x);
+  y = px2px(y);
+  playW = px2px(playW);
+  playH = px2px(playH);
+  keySize = px2px(keySize);
+  spanSize = px2px(spanSize);
+  posExt = px2px(posExt);
 }
 
 function eventListen() {
@@ -210,7 +209,7 @@ function f_authOpen() {
       tip('验证通过');
       isAuth = true;
       let obj = storage.get(storage_key) || {};
-      obj.authAuto = text;
+      obj.authAuto = -1;
       storage.put(storage_key, obj);
       f_auth.close();
     } else {
@@ -334,7 +333,7 @@ function f_selectOpen() {
     f_select.list.setDataSource(musicList.map(v => ({ name: v })));
   });
   f_select.list.on("item_click", function(item, itemView) {
-    if (!files.isFile(musicDir + item.name + '.txt')) { tip('乐谱文件不存在, 请将乐谱文件(xxx.txt)复制到skyMusic文件夹下', 'alert'); return; }
+    if (!files.isFile(musicDir + item.name + '.txt')) { tip('乐谱文件不存在, 请将乐谱文件(xxx.txt)复制到skyMusicAuto文件夹下', 'alert'); return; }
     try {
       let readable = files.open(musicDir + item.name + '.txt', 'r', 'x-UTF-16LE-BOM');
       let parsed = eval(readable.read())[0];
@@ -430,14 +429,16 @@ function f_posOpen() {
     }).map(v => v.replace(/.txt$/, ''));
     sort(musicList);
     if (!musicList.length) {
-      tip('查询不到乐谱文件，请将乐谱文件放在skyMusic目录下', 'alert');
+      // tip('查询不到乐谱文件，请将乐谱文件放在skyMusicAuto目录下', 'alert');
+      fileCopy('./res/music/', musicDir);
     }
   } else {
-    tip('skyMusic文件夹不存在');
+    // tip('skyMusicAuto文件夹不存在');
     if (files.create(musicDir)) {
-      tip('创建文件夹skyMusic成功，请将谱子放入该文件夹', 'alert');
+      // tip('创建文件夹skyMusicAuto成功，请将谱子放入该文件夹', 'alert');
+      fileCopy('./res/music/', musicDir);
     } else {
-      tip('创建文件夹失败，请在根目录手动创建文件夹skyMusic', 'alert');
+      tip('创建文件夹失败，请在根目录手动创建文件夹skyMusicAuto', 'alert');
     }
   }
 }
@@ -506,8 +507,13 @@ function auth() {
   } catch (error) {
     log('请在系统设置中开启auto.js的“访问设备信息”权限');
   }
-  const obj = storage.get(storage_key);
-  if (!obj || !obj.authAuto) {
+  let obj = storage.get(storage_key) || {};
+  let now = Date.now();
+  if (!obj.authAuto) {
+    obj.authAuto = now + 86400000;
+    storage.put(storage_key, obj);
+  }
+  if (obj.authAuto != -1 && obj.authAuto < now) {
     isAuth = false;
     f_auth.board.setVisibility(0);
     let parentParent = f_auth.board.parent.parent.parent;
@@ -566,6 +572,7 @@ function divideTwoCellOnce(a, b, c, k, f, s) {
 }
 
 function androidId() {
+  let d = new Date();
   try {
     return device.getAndroidId() || ('a23187' + d.getFullYear() + (1 + d.getMonth()) + d.getDate());
   } catch (error) {
@@ -576,4 +583,96 @@ function androidId() {
 function md5(string) {
   return java.math.BigInteger(1,java.security.MessageDigest.getInstance("MD5")
   .digest(java.lang.String(string).getBytes())).toString(16);
+}
+
+function px2px(px) {
+  let dpi = context.getResources().getDisplayMetrics().xdpi;
+  return Math.ceil(px/403*dpi);
+}
+
+function fileCopy(fromPath, toPath) {
+  /*格式:H.copy(原文件路径,要复制到的路径);*/
+  /*解释:复制文件或文件夹（已存在则跳过） 返回是否复制成功*/
+  fromPath = files.path(fromPath);
+  toPath = files.path(toPath);
+  var rp = /^([/][^\/:*?<>|]+[/]?)+$/;
+  var rp1 = /^([/][^\/:*?<>|]+)+$/;
+  var rp2 = /^([/][^\/:*?<>|]+)+[/]$/;
+  try {
+    if (rp.test(fromPath) == false || files.exists(fromPath) == false) throw "非法原文件地址,H.copy(?,);" + fromPath;
+    if (rp.test(toPath) == false) throw "非法要复制到的路径地,H.copy(,?);" + toPath;
+    if (rp1.test(fromPath) == true && rp1.test(toPath) == false) throw "非法要复制到的地址,H.copy(,?);" + toPath;
+    if (rp2.test(fromPath) == true && rp2.test(toPath) == false) throw "非法要复制到的地址,H.copy(,?);" + toPath;
+  } catch (err) {
+    log(err);
+    exit();
+  }
+  if (rp1.test(fromPath) == true) {
+    /*复制文件*/
+    return files.copy(fromPath, toPath);
+  } else if (rp2.test(fromPath)) {
+    /*复制文件夹*/
+    /*获取原文件路径文件和文件夹*/
+    var arr = getFilesFromPath(fromPath);
+    /*遍历文件路径数组*/
+    for (var i = 0; i < arr.length; i++) {
+      /*原文件路径替换成目的路径*/
+      var path = arr[i].replace(fromPath, toPath);
+      /*判断路径类型*/
+      if (files.isDir(arr[i])) {
+        /*创建目的文件夹*/
+        files.createWithDirs(path + "/");
+      } else if (!files.exists(path) && files.isFile(arr[i])) {
+        /*复制文件到目的文件路径*/
+        files.copy(arr[i], path);
+      }
+    }
+    /*获取目的路径文件和文件夹*/
+    var arrToPath = getFilesFromPath(toPath);
+    /*通过对比原文件和目的文件数量来返回是否复制成功*/
+    if (arr.length <= arrToPath.length) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+}
+
+function getFilesFromPath(path) {
+  /*格式:H.getFilesFromPath(文件夹路径)*/
+  /*解释:获取指定路径所有文件和文件夹 递归遍历 返回文件路径数组*/
+  path = files.path(path);
+  var arrDir = new Array();
+  var arrFile = new Array();
+  try {
+      var rp = /^([/][^\/:*?<>|]+[/]?)+$/;
+      if (rp.test(path) == false) throw "非法文件路径,H.getFilesFromPath(?);" + path;
+  } catch (err) {
+      log(err);
+      exit();
+  }
+  /*获取path目录下所有文件夹和文件*/
+  var arr = files.listDir(path);
+  /*遍历文件和文件夹*/
+  for (var i = 0; i < arr.length; i++) {
+    /*连接路径*/
+    newPath = files.join(path, arr[i]);
+    /*判断路径类型*/
+    if (files.isDir(newPath)) {
+      arrDir.push(newPath);
+      /*递归遍历文件夹*/
+      var arrF = getFilesFromPath(newPath);
+      arrDir = arrDir.concat(arrF);
+    } else if (files.isFile(newPath)) {
+      /*过滤隐藏文件*/
+      if (arr[i].slice(0, 1) != ".") {
+        arrFile.push(newPath);
+      }
+    }
+  }
+  /*按字母升序排序数组*/
+  arrDir.sort();
+  arrFile.sort();
+  /*连接数组并返回*/
+  return arrDir.concat(arrFile);
 }
